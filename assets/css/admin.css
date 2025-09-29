@@ -1,0 +1,141 @@
+/**
+ * WooCommerce Fix Shipping Tax Admin Styles
+ */
+
+/* Meta Box Styles */
+.wcfst-meta-box {
+    padding: 10px 0;
+}
+
+.wcfst-meta-box p {
+    margin: 0 0 10px;
+}
+
+/* Tab Navigation */
+.wcfst-tabs {
+    margin-top: 15px;
+}
+
+.wcfst-tab-nav {
+    display: flex;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid #ccc;
+}
+
+.wcfst-tab-nav li {
+    margin: 0;
+}
+
+.wcfst-tab-nav li a {
+    display: block;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: #555;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.wcfst-tab-nav li.active a {
+    color: #0073aa;
+    border-bottom-color: #0073aa;
+    font-weight: 600;
+}
+
+.wcfst-tab-nav li a:hover {
+    color: #0073aa;
+    background: #f9f9f9;
+}
+
+/* Tab Content */
+.wcfst-tab-content {
+    display: none;
+}
+
+.wcfst-tab-content.active {
+    display: block;
+}
+
+.wcfst-tab-content table {
+    margin: 0;
+    font-size: 12px;
+}
+
+.wcfst-tab-content table th,
+.wcfst-tab-content table td {
+    padding: 8px;
+}
+
+/* Actions */
+.wcfst-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.wcfst-actions .spinner {
+    float: none;
+    margin: 0 0 0 5px;
+}
+
+.wcfst-no-changes {
+    margin: 10px 0 0;
+    color: #666;
+    font-style: italic;
+}
+
+/* Order List Column */
+.column-shipping_tax_rate {
+    width: 100px;
+}
+
+.wcfst-rate {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.wcfst-rate-15 {
+    background: #d4f4dd;
+    color: #00a32a;
+}
+
+.wcfst-rate-25 {
+    background: #f0f6fc;
+    color: #0073aa;
+}
+
+.wcfst-rate-other {
+    background: #fef7f1;
+    color: #d63638;
+}
+
+.wcfst-rate-none {
+    color: #999;
+}
+
+/* Notices */
+.wcfst-notice {
+    padding: 8px 12px;
+    margin: 10px 0;
+    border-left: 4px solid;
+    background: #fff;
+}
+
+.wcfst-notice.success {
+    border-left-color: #00a32a;
+    background: #f0f9ff;
+}
+
+.wcfst-notice.warning {
+    border-left-color: #f0b849;
+    background: #fef8ee;
+}
+
+.wcfst-notice.error {
+    border-left-color: #d63638;
+    background: #fef1f1;
+}
