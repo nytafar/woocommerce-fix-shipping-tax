@@ -97,7 +97,6 @@ final class WC_Fix_Shipping_Tax {
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-order-meta-box.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-order-list.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-bulk-actions.php';
-            require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-settings.php';
         }
     }
     
@@ -114,7 +113,6 @@ final class WC_Fix_Shipping_Tax {
             $this->modules['order_meta_box'] = new WCFST_Order_Meta_Box($this->modules['core']);
             $this->modules['order_list'] = new WCFST_Order_List($this->modules['core']);
             $this->modules['bulk_actions'] = new WCFST_Bulk_Actions($this->modules['core']);
-            $this->modules['settings'] = new WCFST_Settings();
         }
     }
     
