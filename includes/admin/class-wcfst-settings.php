@@ -31,6 +31,7 @@ class WCFST_Settings {
         add_action('admin_menu', array($this, 'add_settings_page'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('admin_init', array($this, 'handle_tools_actions'));
     }
 
     /**
@@ -78,6 +79,21 @@ class WCFST_Settings {
             array($this, 'render_backup_field'),
             'wcfst_settings_group',
             'wcfst_general_section'
+        );
+
+        add_settings_section(
+            'wcfst_tools_section',
+            __('Tools', 'wc-fix-shipping-tax'),
+            null,
+            'wcfst_settings_group'
+        );
+
+        add_settings_field(
+            'wcfst_update_meta_field',
+            __('Update Order Meta', 'wc-fix-shipping-tax'),
+            array($this, 'render_update_meta_field'),
+            'wcfst_settings_group',
+            'wcfst_tools_section'
         );
     }
 
@@ -177,6 +193,43 @@ class WCFST_Settings {
             </p>
         </fieldset>
         <?php
+    }
+
+    /**
+     * Render update meta field
+     */
+    public function render_update_meta_field() {
+        ?>
+        <p><?php _e('This tool will scan all your orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?></p>
+        <form method="post">
+            <input type="hidden" name="wcfst_action" value="update_meta">
+            <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
+            <?php submit_button(__('Start Meta Update', 'wc-fix-shipping-tax'), 'secondary', 'wcfst_update_meta_submit'); ?>
+        </form>
+        <?php
+    }
+
+    /**
+     * Handle tools actions
+     */
+    public function handle_tools_actions() {
+        if (isset($_POST['wcfst_action']) && $_POST['wcfst_action'] === 'update_meta') {
+            if (!isset($_POST['wcfst_nonce']) || !wp_verify_nonce($_POST['wcfst_nonce'], 'wcfst_update_meta_nonce')) {
+                return;
+            }
+            if (!current_user_can('manage_woocommerce')) {
+                return;
+            }
+
+            $core = WCFST()->get_module('core');
+            if ($core) {
+                $core->schedule_meta_update();
+            }
+
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-success is-dismissible"><p>' . __('Order meta update process has been scheduled. It will run in the background.', 'wc-fix-shipping-tax') . '</p></div>';
+            });
+        }
     }
 
     /**

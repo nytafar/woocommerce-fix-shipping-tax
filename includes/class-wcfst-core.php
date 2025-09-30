@@ -34,6 +34,9 @@ class WCFST_Core {
         if (class_exists('WCFST_Settings')) {
             $this->settings = WCFST_Settings::get_settings();
         }
+
+        // Add hook for background processing
+        add_action('wcfst_process_orders_batch', array($this, 'process_orders_batch'), 10, 1);
     }
     
     /**
@@ -294,8 +297,8 @@ class WCFST_Core {
         global $wpdb;
         $tax_id = $wpdb->get_var($wpdb->prepare(
             "SELECT tax_rate_id FROM {$wpdb->prefix}woocommerce_tax_rates 
-             WHERE tax_rate = %s LIMIT 1",
-            $tax_rate_percent . '.0000'
+             WHERE ROUND(tax_rate) = %d LIMIT 1",
+            $tax_rate_percent
         ));
         
         return $tax_id ? (int) $tax_id : false;
@@ -322,19 +325,28 @@ class WCFST_Core {
      * Get current shipping tax rate for an order
      * 
      * @param WC_Order $order
-     * @return int Tax rate percentage
+     * @return int Tax rate percentage, -1 for no shipping
      */
     public function get_order_shipping_tax_rate($order) {
-        foreach ($order->get_items('shipping') as $item) {
-            $base = $item->get_total();
-            $tax = $item->get_total_tax();
-            
-            if ($base > 0 && $tax > 0) {
-                return round(($tax / $base) * 100);
-            }
+        $shipping_items = $order->get_items('shipping');
+
+        if (empty($shipping_items)) {
+            return -1; // No shipping
         }
-        
-        return 0;
+
+        $total_base = 0;
+        $total_tax = 0;
+
+        foreach ($shipping_items as $item) {
+            $total_base += $item->get_total();
+            $total_tax += $item->get_total_tax();
+        }
+
+        if ($total_base > 0) {
+            return round(($total_tax / $total_base) * 100);
+        }
+
+        return 0; // Shipping with no cost
     }
     
     /**
@@ -344,6 +356,80 @@ class WCFST_Core {
      */
     public function get_available_tax_rates() {
         return $this->tax_rates;
+    }
+
+    /**
+     * Schedule background meta update
+     */
+    public function schedule_meta_update() {
+        // Get the 200 latest order IDs
+        $query = new WC_Order_Query(array(
+            'limit' => 200,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'return' => 'ids',
+        ));
+        $order_ids = $query->get_orders();
+
+        // Store them in a transient
+        set_transient('wcfst_orders_to_process', $order_ids, DAY_IN_SECONDS);
+
+        // Schedule the first batch if not already scheduled.
+        if (function_exists('as_next_scheduled_action') && !as_next_scheduled_action('wcfst_process_orders_batch')) {
+            as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', array('is_first' => true), 'wcfst');
+        }
+    }
+
+    /**
+     * Process a batch of orders to update meta
+     */
+    public function process_orders_batch($args = array()) {
+        $is_first = isset($args['is_first']) && $args['is_first'];
+
+        if ($is_first) {
+            $this->log('Starting batch processing of the 200 latest orders.');
+        }
+
+        // Get orders from transient
+        $order_ids = get_transient('wcfst_orders_to_process');
+
+        if (empty($order_ids)) {
+            $this->log('No more orders to process. Batch processing complete.');
+            delete_transient('wcfst_orders_to_process');
+            return;
+        }
+
+        // Get a batch of 50
+        $batch_ids = array_splice($order_ids, 0, 50);
+
+        $this->log('Found ' . count($batch_ids) . ' orders to process in this batch.');
+
+        foreach ($batch_ids as $order_id) {
+            $this->update_order_meta($order_id);
+        }
+
+        // Update the transient with the remaining IDs
+        set_transient('wcfst_orders_to_process', $order_ids, DAY_IN_SECONDS);
+
+        // Schedule the next batch if there are more orders
+        if (!empty($order_ids)) {
+            as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', array('is_first' => false), 'wcfst');
+            $this->log('Finished a batch. Scheduled the next one.');
+        }
+    }
+
+    /**
+     * Update meta for a single order
+     * 
+     * @param int $order_id
+     */
+    public function update_order_meta($order_id) {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $rate = $this->get_order_shipping_tax_rate($order);
+            $this->log("Updating order {$order_id} with shipping tax rate: {$rate}");
+            update_post_meta($order_id, '_wcfst_shipping_tax_rate', $rate);
+        }
     }
     
     /**
@@ -356,224 +442,5 @@ class WCFST_Core {
             $logger = wc_get_logger();
             $logger->info($message, array('source' => 'wcfst'));
         }
-    }
-}
-        $changes_made = false;
-        
-        foreach ($calculations as $item_id => $calc) {
-            if (!$calc['needs_update']) {
-                continue;
-            }
-            
-            $shipping_item = $order->get_item($item_id);
-            if (!$shipping_item) {
-                continue;
-            }
-            
-            // Apply the new base amount
-            $shipping_item->set_total($calc['new_base']);
-            
-            // Get tax rate ID
-            $tax_rate_id = $this->get_tax_rate_id($order, $tax_rate);
-            
-            if ($tax_rate_id) {
-                // Set new tax amounts
-                $taxes = array(
-                    'total' => array($tax_rate_id => $calc['new_vat']),
-                    'subtotal' => array($tax_rate_id => $calc['new_vat']),
-                );
-                
-                $shipping_item->set_taxes($taxes);
-                $shipping_item->save();
-                $changes_made = true;
-                
-                // Add order note
-                $order->add_order_note(sprintf(
-                    __('Shipping tax fix applied to %s: Base %s → %s, VAT %s → %s (%d%% rate)', 'wc-fix-shipping-tax'),
-                    $calc['shipping_method'],
-                    wc_price($calc['current_base']),
-                    wc_price($calc['new_base']),
-                    wc_price($calc['current_vat']),
-                    wc_price($calc['new_vat']),
-                    $tax_rate
-                ));
-            } else {
-                return array(
-                    'success' => false,
-                    'message' => sprintf(__('Could not find tax rate ID for %d%% rate', 'wc-fix-shipping-tax'), $tax_rate),
-                );
-            }
-        }
-        
-        if ($changes_made) {
-            // Update tax line items
-            $this->update_order_tax_items($order);
-            
-            // Restore original total - CRITICAL
-            $order->set_total($original_total);
-            $order->save();
-            
-            return array(
-                'success' => true,
-                'message' => sprintf(__('Shipping tax fix applied successfully (%d%%)', 'wc-fix-shipping-tax'), $tax_rate),
-            );
-        }
-        
-        return array(
-            'success' => false,
-            'message' => __('No changes were needed', 'wc-fix-shipping-tax'),
-        );
-    }
-    
-    /**
-     * Update order tax line items
-     * 
-     * @param WC_Order $order
-     */
-    private function update_order_tax_items($order) {
-        // Collect all taxes
-        $tax_totals = array();
-        
-        // Product taxes
-        foreach ($order->get_items('line_item') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
-                    }
-                    $tax_totals[$tax_id]['tax_total'] += (float) $amount;
-                }
-            }
-        }
-        
-        // Shipping taxes
-        foreach ($order->get_items('shipping') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
-                    }
-                    $tax_totals[$tax_id]['shipping_tax_total'] += (float) $amount;
-                }
-            }
-        }
-        
-        // Fee taxes
-        foreach ($order->get_items('fee') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
-                    }
-                    $tax_totals[$tax_id]['tax_total'] += (float) $amount;
-                }
-            }
-        }
-        
-        // Remove existing tax items
-        foreach ($order->get_items('tax') as $item_id => $item) {
-            $order->remove_item($item_id);
-        }
-        
-        // Create new tax items
-        foreach ($tax_totals as $tax_id => $totals) {
-            $item = new WC_Order_Item_Tax();
-            $item->set_rate($tax_id);
-            $item->set_tax_total($totals['tax_total']);
-            $item->set_shipping_tax_total($totals['shipping_tax_total']);
-            $order->add_item($item);
-        }
-    }
-    
-    /**
-     * Get tax rate ID for a given percentage
-     * 
-     * @param WC_Order $order
-     * @param int $tax_rate_percent
-     * @return int|false
-     */
-    private function get_tax_rate_id($order, $tax_rate_percent) {
-        // First try to get from existing order items
-        foreach ($order->get_items() as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total']) && is_array($taxes['total'])) {
-                $tax_ids = array_keys($taxes['total']);
-                if (!empty($tax_ids)) {
-                    // Verify this is the right rate
-                    $tax_id = reset($tax_ids);
-                    $rate = $this->get_tax_rate_by_id($tax_id);
-                    if ($rate && abs($rate - $tax_rate_percent) < 1) {
-                        return $tax_id;
-                    }
-                }
-            }
-        }
-        
-        // Try database lookup
-        global $wpdb;
-        $tax_id = $wpdb->get_var($wpdb->prepare(
-            "SELECT tax_rate_id FROM {$wpdb->prefix}woocommerce_tax_rates 
-             WHERE tax_rate = %s LIMIT 1",
-            $tax_rate_percent . '.0000'
-        ));
-        
-        return $tax_id ? (int) $tax_id : false;
-    }
-    
-    /**
-     * Get tax rate percentage by ID
-     * 
-     * @param int $tax_id
-     * @return float|false
-     */
-    private function get_tax_rate_by_id($tax_id) {
-        global $wpdb;
-        $rate = $wpdb->get_var($wpdb->prepare(
-            "SELECT tax_rate FROM {$wpdb->prefix}woocommerce_tax_rates 
-             WHERE tax_rate_id = %d LIMIT 1",
-            $tax_id
-        ));
-        
-        return $rate ? (float) $rate : false;
-    }
-    
-    /**
-     * Get current shipping tax rate for an order
-     * 
-     * @param WC_Order $order
-     * @return int Tax rate percentage
-     */
-    public function get_order_shipping_tax_rate($order) {
-        foreach ($order->get_items('shipping') as $item) {
-            $base = $item->get_total();
-            $tax = $item->get_total_tax();
-            
-            if ($base > 0 && $tax > 0) {
-                return round(($tax / $base) * 100);
-            }
-        }
-        
-        return 0;
-    }
-    
-    /**
-     * Get available tax rates
-     * 
-     * @return array
-     */
-    public function get_available_tax_rates() {
-        return $this->tax_rates;
     }
 }

@@ -46,6 +46,10 @@ class WCFST_Admin {
         
         // Filter order item meta data if needed
         add_filter('woocommerce_order_item_get_formatted_meta_data', array($this, 'filter_order_item_meta'), 10, 2);
+
+        // Update meta on order creation/update
+        add_action('woocommerce_checkout_update_order_meta', array($this, 'update_order_meta'), 10, 1);
+        add_action('woocommerce_saved_order_items', array($this, 'update_order_meta'), 10, 1);
     }
     
     /**
@@ -121,8 +125,35 @@ class WCFST_Admin {
     
     /**
      * Apply tax fix at 25%
+     */
     public function apply_tax_25($order) {
         $this->apply_tax_fix($order, 25);
+    }
+    
+    /**
+     * Apply tax fix
+     */
+    private function apply_tax_fix($order, $tax_rate) {
+        if (!$order instanceof WC_Order) {
+            return;
+        }
+
+        if (!current_user_can('edit_shop_orders', $order->get_id())) {
+            return;
+        }
+
+        $result = $this->core->apply_shipping_tax_fix($order, $tax_rate);
+
+        if ($result['success']) {
+            $order->add_order_note($result['message']);
+        } else {
+            $note = sprintf(
+                __('Failed to apply shipping tax fix (%d%%): %s', 'wc-fix-shipping-tax'),
+                $tax_rate,
+                $result['message']
+            );
+            $order->add_order_note($note);
+        }
     }
     
     /**
@@ -209,5 +240,14 @@ class WCFST_Admin {
     public function filter_order_item_meta($formatted_meta, $order_item) {
         // You can filter out specific meta keys if needed
         return $formatted_meta;
+    }
+
+    /**
+     * Update order meta on creation/update
+     * 
+     * @param int $order_id
+     */
+    public function update_order_meta($order_id) {
+        $this->core->update_order_meta($order_id);
     }
 }

@@ -67,16 +67,21 @@ class WCFST_Order_List {
         if ('shipping_tax_rate' !== $column) {
             return;
         }
-        
-        $order = wc_get_order($post_id);
-        if (!$order) {
-            echo '—';
+
+        $rate = get_post_meta($post_id, '_wcfst_shipping_tax_rate', true);
+
+        if ($rate === '') { // Not processed yet
+            echo '<span class="wcfst-rate-none">N/A</span>';
             return;
         }
-        
-        $rate = $this->core->get_order_shipping_tax_rate($order);
-        
-        if ($rate > 0) {
+
+        $rate = (int) $rate;
+
+        if ($rate === -1) {
+            echo '<span class="wcfst-rate-none">' . __('No shipping', 'wc-fix-shipping-tax') . '</span>';
+        } elseif ($rate === 0) {
+            echo '<span class="wcfst-rate-none">0%</span>';
+        } elseif ($rate > 0) {
             $class = '';
             if (abs($rate - 15) < 1) {
                 $class = 'wcfst-rate-15';
@@ -85,7 +90,7 @@ class WCFST_Order_List {
             } else {
                 $class = 'wcfst-rate-other';
             }
-            
+
             printf(
                 '<span class="wcfst-rate %s">%d%%</span>',
                 esc_attr($class),
@@ -135,6 +140,7 @@ class WCFST_Order_List {
             <option value=""><?php _e('All shipping tax rates', 'wc-fix-shipping-tax'); ?></option>
             <option value="15" <?php selected('15', $current); ?>><?php _e('15% tax rate', 'wc-fix-shipping-tax'); ?></option>
             <option value="25" <?php selected('25', $current); ?>><?php _e('25% tax rate', 'wc-fix-shipping-tax'); ?></option>
+            <option value="0" <?php selected('0', $current); ?>><?php _e('0% tax rate', 'wc-fix-shipping-tax'); ?></option>
             <option value="other" <?php selected('other', $current); ?>><?php _e('Other tax rates', 'wc-fix-shipping-tax'); ?></option>
             <option value="none" <?php selected('none', $current); ?>><?php _e('No shipping', 'wc-fix-shipping-tax'); ?></option>
         </select>
@@ -153,15 +159,13 @@ class WCFST_Order_List {
             return;
         }
         
-        if (empty($_GET['wcfst_tax_filter'])) {
+        if (!isset($_GET['wcfst_tax_filter']) || $_GET['wcfst_tax_filter'] === '') {
             return;
         }
         
         $filter = $_GET['wcfst_tax_filter'];
         
-        // Store shipping tax rate in meta for filtering
-        // This would need to be populated on order save
-        $meta_query = array();
+        $meta_query = $query->get('meta_query') ?: array();
         
         switch ($filter) {
             case '15':
@@ -181,44 +185,44 @@ class WCFST_Order_List {
                     'compare' => 'BETWEEN',
                 );
                 break;
+
+            case '0':
+                $meta_query[] = array(
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'value' => 0,
+                    'type' => 'NUMERIC',
+                    'compare' => '=',
+                );
+                break;
                 
             case 'other':
+                $meta_query['relation'] = 'AND';
                 $meta_query[] = array(
-                    'relation' => 'AND',
-                    array(
-                        'key' => '_wcfst_shipping_tax_rate',
-                        'value' => 0,
-                        'type' => 'NUMERIC',
-                        'compare' => '>',
-                    ),
-                    array(
-                        'key' => '_wcfst_shipping_tax_rate',
-                        'value' => array(14, 16),
-                        'type' => 'NUMERIC',
-                        'compare' => 'NOT BETWEEN',
-                    ),
-                    array(
-                        'key' => '_wcfst_shipping_tax_rate',
-                        'value' => array(24, 26),
-                        'type' => 'NUMERIC',
-                        'compare' => 'NOT BETWEEN',
-                    ),
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'value' => 0,
+                    'type' => 'NUMERIC',
+                    'compare' => '>',
+                );
+                $meta_query[] = array(
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'value' => array(14, 16),
+                    'type' => 'NUMERIC',
+                    'compare' => 'NOT BETWEEN',
+                );
+                $meta_query[] = array(
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'value' => array(24, 26),
+                    'type' => 'NUMERIC',
+                    'compare' => 'NOT BETWEEN',
                 );
                 break;
                 
             case 'none':
                 $meta_query[] = array(
-                    'relation' => 'OR',
-                    array(
-                        'key' => '_wcfst_shipping_tax_rate',
-                        'value' => 0,
-                        'type' => 'NUMERIC',
-                        'compare' => '=',
-                    ),
-                    array(
-                        'key' => '_wcfst_shipping_tax_rate',
-                        'compare' => 'NOT EXISTS',
-                    ),
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'value' => -1,
+                    'type' => 'NUMERIC',
+                    'compare' => '=',
                 );
                 break;
         }
