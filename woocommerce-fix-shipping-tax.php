@@ -110,11 +110,16 @@ final class WC_Fix_Shipping_Tax {
         
         // Admin modules
         if (is_admin()) {
+            $this->modules['settings'] = new WCFST_Settings();
+            $settings = WCFST_Settings::get_settings();
+
             $this->modules['admin'] = new WCFST_Admin($this->modules['core']);
             $this->modules['order_meta_box'] = new WCFST_Order_Meta_Box($this->modules['core']);
-            $this->modules['order_list'] = new WCFST_Order_List($this->modules['core']);
             $this->modules['bulk_actions'] = new WCFST_Bulk_Actions($this->modules['core']);
-            $this->modules['settings'] = new WCFST_Settings();
+
+            if ($settings['enable_order_list_column']) {
+                $this->modules['order_list'] = new WCFST_Order_List($this->modules['core']);
+            }
         }
     }
     

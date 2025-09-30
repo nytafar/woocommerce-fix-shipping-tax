@@ -66,17 +66,25 @@ class WCFST_Settings {
         );
 
         add_settings_field(
-            'wcfst_enable_logging',
-            __('Enable Debug Logging', 'wc-fix-shipping-tax'),
-            array($this, 'render_logging_field'),
+            'wcfst_enable_order_list_column',
+            __('Enable Order List Column', 'wc-fix-shipping-tax'),
+            array($this, 'render_order_list_column_field'),
             'wcfst_settings_group',
             'wcfst_general_section'
         );
 
         add_settings_field(
             'wcfst_auto_backup',
-            __('Create Order Backup', 'wc-fix-shipping-tax'),
+            __('Create Order Note', 'wc-fix-shipping-tax'),
             array($this, 'render_backup_field'),
+            'wcfst_settings_group',
+            'wcfst_general_section'
+        );
+
+        add_settings_field(
+            'wcfst_enable_logging',
+            __('Enable Debug Logging', 'wc-fix-shipping-tax'),
+            array($this, 'render_logging_field'),
             'wcfst_settings_group',
             'wcfst_general_section'
         );
@@ -178,7 +186,7 @@ class WCFST_Settings {
         ?>
         <fieldset>
             <legend class="screen-reader-text">
-                <span><?php _e('Create Order Backup', 'wc-fix-shipping-tax'); ?></span>
+                <span><?php _e('Create Order Note', 'wc-fix-shipping-tax'); ?></span>
             </legend>
             <label for="wcfst_auto_backup">
                 <input type="checkbox"
@@ -186,10 +194,36 @@ class WCFST_Settings {
                        name="wcfst_settings[auto_backup]"
                        value="1"
                        <?php checked($enabled, true); ?> />
-                <?php _e('Create automatic backup notes before applying fixes', 'wc-fix-shipping-tax'); ?>
+                <?php _e('Add a detailed note to the order after applying a fix.', 'wc-fix-shipping-tax'); ?>
             </label>
             <p class="description">
-                <?php _e('When enabled, the plugin will add order notes showing original values before applying fixes.', 'wc-fix-shipping-tax'); ?>
+                <?php _e('The note shows the before and after values for shipping items and order totals.', 'wc-fix-shipping-tax'); ?>
+            </p>
+        </fieldset>
+        <?php
+    }
+
+    /**
+     * Render order list column field
+     */
+    public function render_order_list_column_field() {
+        $settings = self::get_settings();
+        $enabled = $settings['enable_order_list_column'];
+        ?>
+        <fieldset>
+            <legend class="screen-reader-text">
+                <span><?php _e('Enable Order List Column', 'wc-fix-shipping-tax'); ?></span>
+            </legend>
+            <label for="wcfst_enable_order_list_column">
+                <input type="checkbox"
+                       id="wcfst_enable_order_list_column"
+                       name="wcfst_settings[enable_order_list_column]"
+                       value="1"
+                       <?php checked($enabled, true); ?> />
+                <?php _e('Enable the "Shipping Tax" column and filter in the WooCommerce order list.', 'wc-fix-shipping-tax'); ?>
+            </label>
+            <p class="description">
+                <?php _e('This feature adds a custom column to the order list for viewing and filtering by shipping tax rate.', 'wc-fix-shipping-tax'); ?>
             </p>
         </fieldset>
         <?php
@@ -200,7 +234,7 @@ class WCFST_Settings {
      */
     public function render_update_meta_field() {
         ?>
-        <p><?php _e('This tool will scan all your orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?></p>
+        <p><?php _e('This tool will scan your 200 latest orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?></p>
         <form method="post">
             <input type="hidden" name="wcfst_action" value="update_meta">
             <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
@@ -239,7 +273,8 @@ class WCFST_Settings {
         $sanitized = array();
 
         $sanitized['enable_logging'] = isset($input['enable_logging']) ? (bool) $input['enable_logging'] : false;
-        $sanitized['auto_backup'] = isset($input['auto_backup']) ? (bool) $input['auto_backup'] : true;
+        $sanitized['auto_backup'] = isset($input['auto_backup']) ? (bool) $input['auto_backup'] : false;
+        $sanitized['enable_order_list_column'] = isset($input['enable_order_list_column']) ? (bool) $input['enable_order_list_column'] : false;
 
         return $sanitized;
     }
@@ -251,6 +286,7 @@ class WCFST_Settings {
         return get_option('wcfst_settings', array(
             'enable_logging' => false,
             'auto_backup' => true,
+            'enable_order_list_column' => false,
         ));
     }
 
