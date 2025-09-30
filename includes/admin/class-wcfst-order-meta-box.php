@@ -107,14 +107,23 @@ class WCFST_Order_Meta_Box {
      * Render tab content
      */
     private function render_tab_content($order, $tax_rate, $calculations) {
-        if (empty($calculations)) {
-            echo '<p>' . __('No shipping items found', 'wc-fix-shipping-tax') . '</p>';
+        if (empty($calculations) || empty($calculations['items'])) {
+            echo '<p>' . __('No shipping items found or no changes needed.', 'wc-fix-shipping-tax') . '</p>';
             return;
         }
-        
+
+        $item_calculations = $calculations['items'];
+        $preview = $calculations['preview'];
         $needs_update = false;
-        
+        foreach ($item_calculations as $calc) {
+            if ($calc['needs_update']) {
+                $needs_update = true;
+                break;
+            }
+        }
         ?>
+        
+        <h4><?php _e('Shipping Item Changes', 'wc-fix-shipping-tax'); ?></h4>
         <table class="widefat">
             <thead>
                 <tr>
@@ -124,8 +133,7 @@ class WCFST_Order_Meta_Box {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($calculations as $calc) : ?>
-                    <?php $needs_update = $needs_update || $calc['needs_update']; ?>
+                <?php foreach ($item_calculations as $calc) : ?>
                     <tr>
                         <td><?php echo esc_html($calc['shipping_method']); ?></td>
                         <td>
@@ -142,8 +150,33 @@ class WCFST_Order_Meta_Box {
                 <?php endforeach; ?>
             </tbody>
         </table>
-        
-        <?php if ($needs_update) : ?>
+
+        <?php if ($needs_update && !empty($preview)) : ?>
+            <h4 style="margin-top: 15px;"><?php _e('Order Totals Preview', 'wc-fix-shipping-tax'); ?></h4>
+            <table class="widefat">
+                <thead>
+                    <tr>
+                        <th><?php _e('Total', 'wc-fix-shipping-tax'); ?></th>
+                        <th><?php _e('Current', 'wc-fix-shipping-tax'); ?></th>
+                        <th><?php _e('After Fix', 'wc-fix-shipping-tax'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><?php _e('Shipping', 'wc-fix-shipping-tax'); ?></td>
+                        <td><?php echo wc_price($preview['before']['shipping']); ?></td>
+                        <td><?php echo wc_price($preview['after']['shipping']); ?></td>
+                    </tr>
+                    <?php foreach ($preview['before']['taxes'] as $rate_id => $tax) : ?>
+                        <tr>
+                            <td><?php echo esc_html($tax['label']); ?></td>
+                            <td><?php echo wc_price($tax['total']); ?></td>
+                            <td><?php echo wc_price($preview['after']['taxes'][$rate_id]['total'] ?? 0); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
             <div class="wcfst-actions">
                 <button type="button" 
                         class="button button-primary wcfst-apply-fix" 

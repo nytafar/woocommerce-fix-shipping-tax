@@ -51,38 +51,31 @@ class WCFST_Core {
             $this->log('Invalid order object provided to calculate_shipping_tax_fix');
             return array();
         }
-        
+
         if (!isset($this->tax_rates[$tax_rate])) {
             $this->log("Invalid tax rate: {$tax_rate}%");
             return array();
         }
-        
-        $result = array();
+
+        $item_calculations = array();
         $tax_decimal = $this->tax_rates[$tax_rate]['decimal'];
         $tax_multiplier = 1 + $tax_decimal;
-        
+
         foreach ($order->get_items('shipping') as $item_id => $item) {
-            // Get current values
             $current_base = $item->get_total();
-            $current_tax = $item->get_total_tax();
-            $total_incl = $current_base + $current_tax;
-            
-            // Skip if no total
-            if ($total_incl <= 0) {
-                continue;
-            }
-            
-            // Calculate new values
+            $current_total_tax = $item->get_total_tax();
+            $total_incl = $current_base + $current_total_tax;
+
+            if ($total_incl <= 0) continue;
+
             $new_base = round($total_incl / $tax_multiplier, 2);
             $new_vat = round($total_incl - $new_base, 2);
-            
-            // Check if update is needed
-            $needs_update = (abs($new_base - $current_base) > 0.01) || (abs($new_vat - $current_tax) > 0.01);
-            
-            $result[$item_id] = array(
+            $needs_update = (abs($new_base - $current_base) > 0.01) || (abs($new_vat - $current_total_tax) > 0.01);
+
+            $item_calculations[$item_id] = array(
                 'shipping_method' => $item->get_method_title(),
                 'current_base' => $current_base,
-                'current_vat' => $current_tax,
+                'current_vat' => $current_total_tax,
                 'current_total' => $total_incl,
                 'new_base' => $new_base,
                 'new_vat' => $new_vat,
@@ -91,182 +84,161 @@ class WCFST_Core {
                 'totals_match' => abs(($new_base + $new_vat) - $total_incl) < 0.01,
             );
         }
-        
-        return $result;
-    }
-    
-    /**
-     * Apply shipping tax fix to an order
-     * 
-     * @param WC_Order $order Order object
-     * @param int $tax_rate Tax rate percentage (15 or 25)
-     * @return array Results array with 'success' and 'message' keys
-     */
-    public function apply_shipping_tax_fix($order, $tax_rate) {
-        if (!$order instanceof WC_Order) {
-            $this->log('Invalid order object provided to apply_shipping_tax_fix');
-            return array(
-                'success' => false,
-                'message' => __('Invalid order object', 'wc-fix-shipping-tax'),
+
+        if (empty($item_calculations)) {
+            return array();
+        }
+
+        // --- Preview Calculation ---
+        $preview = array(
+            'before' => array('shipping' => $order->get_shipping_total(), 'taxes' => array()),
+            'after' => array('shipping' => 0, 'taxes' => array()),
+        );
+
+        // Get current tax totals
+        foreach ($order->get_taxes() as $tax) {
+            $rate_id = $tax->get_rate_id();
+            $preview['before']['taxes'][$rate_id] = array(
+                'label' => $tax->get_label(),
+                'total' => $tax->get_tax_total() + $tax->get_shipping_tax_total(),
+            );
+            // Initialize after state
+            $preview['after']['taxes'][$rate_id] = array(
+                'label' => $tax->get_label(),
+                'total' => $tax->get_tax_total(), // Start with non-shipping tax
             );
         }
-        
-        // Get calculations
-        $calculations = $this->calculate_shipping_tax_fix($order, $tax_rate);
-        
-        if (empty($calculations)) {
-            $this->log('No shipping items found for tax fix');
-            return array(
-                'success' => false,
-                'message' => __('No shipping items found', 'wc-fix-shipping-tax'),
+
+        // Calculate new shipping total and new shipping taxes
+        $new_shipping_total = 0;
+        $new_shipping_tax_total = 0;
+        $new_target_rate_id = $this->get_tax_rate_id($order, $tax_rate);
+
+        foreach ($item_calculations as $calc) {
+            $new_shipping_total += $calc['new_base'];
+            $new_shipping_tax_total += $calc['new_vat'];
+        }
+        $preview['after']['shipping'] = $new_shipping_total;
+
+        // Add the new shipping tax to the correct tax rate in the 'after' preview
+        if (isset($preview['after']['taxes'][$new_target_rate_id])) {
+            $preview['after']['taxes'][$new_target_rate_id]['total'] += $new_shipping_tax_total;
+        } else { // The target tax rate might not exist on the order yet
+            $preview['after']['taxes'][$new_target_rate_id] = array(
+                'label' => WC_Tax::get_rate_label($new_target_rate_id),
+                'total' => $new_shipping_tax_total,
             );
         }
-        
-        // Store original total
-        $original_total = $order->get_total();
-        $this->log("Original order total: " . wc_price($original_total));
-        
-        // Apply fixes
-        $changes_made = false;
-        
-        foreach ($calculations as $item_id => $calc) {
-            if (!$calc['needs_update']) {
-                continue;
-            }
-            
-            $shipping_item = $order->get_item($item_id);
-            if (!$shipping_item) {
-                $this->log("Shipping item {$item_id} not found");
-                continue;
-            }
-            
-            // Apply the new base amount
-            $shipping_item->set_total($calc['new_base']);
-            
-            // Get tax rate ID
-            $tax_rate_id = $this->get_tax_rate_id($order, $tax_rate);
-            
-            if ($tax_rate_id) {
-                // Set new tax amounts
-                $taxes = array(
-                    'total' => array($tax_rate_id => $calc['new_vat']),
-                    'subtotal' => array($tax_rate_id => $calc['new_vat']),
-                );
-                
-                $shipping_item->set_taxes($taxes);
-                $shipping_item->save();
-                $changes_made = true;
-                
-                $this->log(sprintf(
-                    'Applied shipping tax fix: %s - Base: %s → %s, VAT: %s → %s',
-                    $calc['shipping_method'],
-                    wc_price($calc['current_base']),
-                    wc_price($calc['new_base']),
-                    wc_price($calc['current_vat']),
-                    wc_price($calc['new_vat'])
-                ));
-            } else {
-                $this->log("Could not find tax rate ID for {$tax_rate}% rate");
-                return array(
-                    'success' => false,
-                    'message' => sprintf(__('Could not find tax rate ID for %d%% rate', 'wc-fix-shipping-tax'), $tax_rate),
-                );
-            }
-        }
-        
-        if ($changes_made) {
-            // Update tax line items
-            $this->update_order_tax_items($order);
-            
-            // Restore original total - CRITICAL
-            $order->set_total($original_total);
-            $order->save();
-            
-            $this->log("Shipping tax fix applied successfully, total preserved: " . wc_price($original_total));
-            
-            return array(
-                'success' => true,
-                'message' => sprintf(__('Shipping tax fix applied successfully (%d%%)', 'wc-fix-shipping-tax'), $tax_rate),
-            );
-        }
-        
-        $this->log('No changes were needed for shipping tax fix');
+
         return array(
-            'success' => false,
-            'message' => __('No changes were needed', 'wc-fix-shipping-tax'),
+            'items' => $item_calculations,
+            'preview' => $preview,
         );
     }
     
-    /**
-     * Update order tax line items
-     * 
-     * @param WC_Order $order
-     */
-    private function update_order_tax_items($order) {
-        // Collect all taxes
-        $tax_totals = array();
-        
-        // Product taxes
-        foreach ($order->get_items('line_item') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
-                    }
-                    $tax_totals[$tax_id]['tax_total'] += (float) $amount;
-                }
+    public function apply_shipping_tax_fix($order, $tax_rate) {
+        if (!$order instanceof WC_Order) {
+            $this->log('Invalid order object provided to apply_shipping_tax_fix');
+            return array('success' => false, 'message' => __('Invalid order object', 'wc-fix-shipping-tax'));
+        }
+
+        $calculation_data = $this->calculate_shipping_tax_fix($order, $tax_rate);
+        if (empty($calculation_data) || empty($calculation_data['items'])) {
+            $this->log('No shipping items found for tax fix');
+            return array('success' => false, 'message' => __('No shipping items found', 'wc-fix-shipping-tax'));
+        }
+
+        $calculations = $calculation_data['items'];
+        $original_total = $order->get_total();
+        $this->log("Original order total: " . wc_price($original_total));
+
+        $changes_made = false;
+        foreach ($calculations as $item_id => $calc) {
+            if (!$calc['needs_update']) continue;
+
+            $shipping_item = $order->get_item($item_id);
+            if (!$shipping_item) continue;
+
+            $shipping_item->set_total($calc['new_base']);
+            $tax_rate_id = $this->get_tax_rate_id($order, $tax_rate);
+
+            if ($tax_rate_id) {
+                $shipping_item->set_taxes(array('total' => array($tax_rate_id => $calc['new_vat'])));
+                $shipping_item->save();
+                $changes_made = true;
+            } else {
+                $this->log("Could not find tax rate ID for {$tax_rate}% rate");
+                return array('success' => false, 'message' => sprintf(__('Could not find tax rate ID for %d%% rate', 'wc-fix-shipping-tax'), $tax_rate));
             }
         }
-        
-        // Shipping taxes
-        foreach ($order->get_items('shipping') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
+
+        if ($changes_made) {
+            // Force a refresh of the order object to get the latest item data
+            $order = wc_get_order($order->get_id());
+
+            // Manually recalculate all totals
+            $shipping_total = 0;
+            $shipping_tax_total = 0;
+            $order_tax_total = 0;
+            $tax_rate_breakdown = array();
+
+            // Initialize breakdown with all possible tax rates in the order to handle removals
+            foreach ($order->get_taxes() as $tax) {
+                $tax_rate_breakdown[$tax->get_rate_id()] = ['cart_tax' => 0, 'shipping_tax' => 0];
+            }
+
+            foreach ($order->get_items(['line_item', 'fee', 'shipping']) as $item) {
+                $item_taxes = $item->get_taxes()['total'];
+                foreach ($item_taxes as $rate_id => $tax) {
+                    if (!isset($tax_rate_breakdown[$rate_id])) {
+                        $tax_rate_breakdown[$rate_id] = ['cart_tax' => 0, 'shipping_tax' => 0];
                     }
-                    $tax_totals[$tax_id]['shipping_tax_total'] += (float) $amount;
+                    if ($item->is_type('shipping')) {
+                        $tax_rate_breakdown[$rate_id]['shipping_tax'] += $tax;
+                    } else {
+                        $tax_rate_breakdown[$rate_id]['cart_tax'] += $tax;
+                    }
+                }
+                if ($item->is_type('shipping')) {
+                    $shipping_total += $item->get_total();
+                    $shipping_tax_total += $item->get_total_tax();
                 }
             }
-        }
-        
-        // Fee taxes
-        foreach ($order->get_items('fee') as $item) {
-            $taxes = $item->get_taxes();
-            if (!empty($taxes['total'])) {
-                foreach ($taxes['total'] as $tax_id => $amount) {
-                    if (!isset($tax_totals[$tax_id])) {
-                        $tax_totals[$tax_id] = array(
-                            'tax_total' => 0,
-                            'shipping_tax_total' => 0,
-                        );
-                    }
-                    $tax_totals[$tax_id]['tax_total'] += (float) $amount;
+
+            foreach ($tax_rate_breakdown as $totals) {
+                $order_tax_total += $totals['cart_tax'] + $totals['shipping_tax'];
+            }
+
+            // Update tax summary items
+            $order->remove_order_items('tax');
+            foreach ($tax_rate_breakdown as $rate_id => $totals) {
+                if ($totals['cart_tax'] + $totals['shipping_tax'] > 0) {
+                    $item = new WC_Order_Item_Tax();
+                    $item->set_rate_id($rate_id);
+                    $item->set_tax_total($totals['cart_tax']);
+                    $item->set_shipping_tax_total($totals['shipping_tax']);
+                    $item->set_label(WC_Tax::get_rate_label($rate_id));
+                    $order->add_item($item);
                 }
             }
+
+            // Direct DB updates for order totals
+            update_post_meta($order->get_id(), '_order_shipping', wc_format_decimal($shipping_total));
+            update_post_meta($order->get_id(), '_order_shipping_tax', wc_format_decimal($shipping_tax_total));
+            update_post_meta($order->get_id(), '_order_tax', wc_format_decimal($order_tax_total));
+            update_post_meta($order->get_id(), '_order_total', wc_format_decimal($original_total));
+
+            // Clear caches
+            wp_cache_delete($order->get_id(), 'post_meta');
+            $order->read_meta_data(true);
+            $order->save();
+
+            $this->log("Shipping tax fix applied successfully, total preserved: " . wc_price($original_total));
+            return array('success' => true, 'message' => sprintf(__('Shipping tax fix applied successfully (%d%%)', 'wc-fix-shipping-tax'), $tax_rate));
         }
-        
-        // Remove existing tax items
-        foreach ($order->get_items('tax') as $item_id => $item) {
-            $order->remove_item($item_id);
-        }
-        
-        // Create new tax items
-        foreach ($tax_totals as $tax_id => $totals) {
-            $item = new WC_Order_Item_Tax();
-            $item->set_rate($tax_id);
-            $item->set_tax_total($totals['tax_total']);
-            $item->set_shipping_tax_total($totals['shipping_tax_total']);
-            $order->add_item($item);
-        }
+
+        $this->log('No changes were needed for shipping tax fix');
+        return array('success' => false, 'message' => __('No changes were needed', 'wc-fix-shipping-tax'));
     }
     
     /**
