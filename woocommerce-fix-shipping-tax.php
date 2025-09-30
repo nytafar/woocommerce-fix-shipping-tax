@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: WooCommerce Fix Shipping Tax
- * Plugin URI: https://myrvann.no/
+ * Plugin URI: https://jellum.net/
  * Description: Fixes shipping tax calculations in existing orders to ensure proper VAT distribution
- * Version: 2.0.0
- * Author: Myrvann
+ * Version: 3.0.0
+ * Author: Lasse Jellum
  * Text Domain: wc-fix-shipping-tax
  * Domain Path: /languages
  * Requires at least: 5.6
