@@ -233,6 +233,9 @@ class WCFST_Core {
             $order->read_meta_data(true);
             $order->save();
 
+            // Update the meta field for the order list column
+            $this->update_order_meta($order->get_id());
+
             $this->log("Shipping tax fix applied successfully, total preserved: " . wc_price($original_total));
             return array('success' => true, 'message' => sprintf(__('Shipping tax fix applied successfully (%d%%)', 'wc-fix-shipping-tax'), $tax_rate));
         }
