@@ -13,11 +13,6 @@ if (!defined('ABSPATH')) {
 class WCFST_Settings {
 
     /**
-     * Settings page slug
-     */
-    const PAGE_SLUG = 'wcfst-settings';
-
-    /**
      * Constructor
      */
     public function __construct() {
@@ -28,218 +23,95 @@ class WCFST_Settings {
      * Initialize hooks
      */
     private function init_hooks() {
-        add_action('admin_menu', array($this, 'add_settings_page'));
-        add_action('admin_init', array($this, 'register_settings'));
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_filter('woocommerce_get_sections_tax', array($this, 'add_tax_section'));
+        add_filter('woocommerce_get_settings_tax', array($this, 'add_tax_settings'), 10, 2);
+        add_action('woocommerce_admin_field_wcfst_update_meta_button', array($this, 'render_update_meta_button'));
         add_action('admin_init', array($this, 'handle_tools_actions'));
     }
 
     /**
-     * Add settings page to admin menu
+     * Add settings section to the Tax tab
      */
-    public function add_settings_page() {
-        add_submenu_page(
-            'woocommerce',
-            __('Fix Shipping Tax Settings', 'wc-fix-shipping-tax'),
-            __('Fix Shipping Tax', 'wc-fix-shipping-tax'),
-            'manage_woocommerce',
-            self::PAGE_SLUG,
-            array($this, 'render_settings_page')
-        );
+    public function add_tax_section($sections) {
+        $sections['wcfst'] = __('Shipping Tax Fix', 'wc-fix-shipping-tax');
+        return $sections;
     }
 
     /**
-     * Register plugin settings
+     * Add settings fields to the new section
      */
-    public function register_settings() {
-        register_setting(
-            'wcfst_settings_group',
-            'wcfst_settings',
-            array($this, 'sanitize_settings')
-        );
-
-        add_settings_section(
-            'wcfst_general_section',
-            __('General Settings', 'wc-fix-shipping-tax'),
-            array($this, 'render_general_section'),
-            'wcfst_settings_group'
-        );
-
-        add_settings_field(
-            'wcfst_enable_order_list_column',
-            __('Enable Order List Column', 'wc-fix-shipping-tax'),
-            array($this, 'render_order_list_column_field'),
-            'wcfst_settings_group',
-            'wcfst_general_section'
-        );
-
-        add_settings_field(
-            'wcfst_auto_backup',
-            __('Create Order Note', 'wc-fix-shipping-tax'),
-            array($this, 'render_backup_field'),
-            'wcfst_settings_group',
-            'wcfst_general_section'
-        );
-
-        add_settings_field(
-            'wcfst_enable_logging',
-            __('Enable Debug Logging', 'wc-fix-shipping-tax'),
-            array($this, 'render_logging_field'),
-            'wcfst_settings_group',
-            'wcfst_general_section'
-        );
-
-        add_settings_section(
-            'wcfst_tools_section',
-            __('Tools', 'wc-fix-shipping-tax'),
-            null,
-            'wcfst_settings_group'
-        );
-
-        add_settings_field(
-            'wcfst_update_meta_field',
-            __('Update Order Meta', 'wc-fix-shipping-tax'),
-            array($this, 'render_update_meta_field'),
-            'wcfst_settings_group',
-            'wcfst_tools_section'
-        );
-    }
-
-    /**
-     * Enqueue settings scripts
-     */
-    public function enqueue_scripts($hook) {
-        if ($hook !== 'woocommerce_page_' . self::PAGE_SLUG) {
-            return;
+    public function add_tax_settings($settings, $current_section) {
+        if ('wcfst' === $current_section) {
+            $wcfst_settings = array(
+                array(
+                    'title' => __('Shipping Tax Fix Settings', 'wc-fix-shipping-tax'),
+                    'type'  => 'title',
+                    'id'    => 'wcfst_title',
+                ),
+                array(
+                    'title'   => __('Enable Order List Column', 'wc-fix-shipping-tax'),
+                    'desc'    => __('Enable the "Shipping Tax" column and filter in the WooCommerce order list.', 'wc-fix-shipping-tax'),
+                    'id'      => 'wcfst_enable_order_list_column',
+                    'type'    => 'checkbox',
+                    'default' => 'no',
+                ),
+                array(
+                    'title'   => __('Create Order Note', 'wc-fix-shipping-tax'),
+                    'desc'    => __('Add a detailed note to the order after applying a fix.', 'wc-fix-shipping-tax'),
+                    'id'      => 'wcfst_auto_backup',
+                    'type'    => 'checkbox',
+                    'default' => 'yes',
+                ),
+                array(
+                    'title'   => __('Enable Debug Logging', 'wc-fix-shipping-tax'),
+                    'desc'    => __('Enable detailed debug logging for troubleshooting.', 'wc-fix-shipping-tax'),
+                    'id'      => 'wcfst_enable_logging',
+                    'type'    => 'checkbox',
+                    'default' => 'no',
+                ),
+                array(
+                    'type' => 'sectionend',
+                    'id'   => 'wcfst_section_end',
+                ),
+                array(
+                    'title' => __('Tools', 'wc-fix-shipping-tax'),
+                    'type'  => 'title',
+                    'id'    => 'wcfst_tools_title',
+                ),
+                array(
+                    'title' => __('Update Order Meta', 'wc-fix-shipping-tax'),
+                    'type'  => 'wcfst_update_meta_button',
+                ),
+                array(
+                    'type' => 'sectionend',
+                    'id'   => 'wcfst_tools_section_end',
+                ),
+            );
+            return $wcfst_settings;
         }
-
-        wp_enqueue_style(
-            'wcfst-admin',
-            WCFST_PLUGIN_URL . 'assets/css/admin.css',
-            array(),
-            WCFST_VERSION
-        );
+        return $settings;
     }
 
     /**
-     * Render settings page
+     * Render the update meta button
      */
-    public function render_settings_page() {
+    public function render_update_meta_button() {
         ?>
-        <div class="wrap">
-            <h1><?php _e('WooCommerce Fix Shipping Tax Settings', 'wc-fix-shipping-tax'); ?></h1>
-
-            <p class="description">
-                <?php _e('Configure the behavior of the shipping tax fix plugin.', 'wc-fix-shipping-tax'); ?>
-            </p>
-
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('wcfst_settings_group');
-                do_settings_sections('wcfst_settings_group');
-                submit_button();
-                ?>
-            </form>
-        </div>
-        <?php
-    }
-
-    /**
-     * Render general settings section
-     */
-    public function render_general_section() {
-        echo '<p>' . __('Configure general plugin behavior:', 'wc-fix-shipping-tax') . '</p>';
-    }
-
-    /**
-     * Render logging field
-     */
-    public function render_logging_field() {
-        $settings = get_option('wcfst_settings', array());
-        $enabled = isset($settings['enable_logging']) ? $settings['enable_logging'] : false;
-        ?>
-        <fieldset>
-            <legend class="screen-reader-text">
-                <span><?php _e('Enable Debug Logging', 'wc-fix-shipping-tax'); ?></span>
-            </legend>
-            <label for="wcfst_enable_logging">
-                <input type="checkbox"
-                       id="wcfst_enable_logging"
-                       name="wcfst_settings[enable_logging]"
-                       value="1"
-                       <?php checked($enabled, true); ?> />
-                <?php _e('Enable detailed debug logging for troubleshooting', 'wc-fix-shipping-tax'); ?>
-            </label>
-            <p class="description">
-                <?php _e('When enabled, detailed logs will be written to the WooCommerce log files.', 'wc-fix-shipping-tax'); ?>
-            </p>
-        </fieldset>
-        <?php
-    }
-
-    /**
-     * Render backup field
-     */
-    public function render_backup_field() {
-        $settings = get_option('wcfst_settings', array());
-        $enabled = isset($settings['auto_backup']) ? $settings['auto_backup'] : true;
-        ?>
-        <fieldset>
-            <legend class="screen-reader-text">
-                <span><?php _e('Create Order Note', 'wc-fix-shipping-tax'); ?></span>
-            </legend>
-            <label for="wcfst_auto_backup">
-                <input type="checkbox"
-                       id="wcfst_auto_backup"
-                       name="wcfst_settings[auto_backup]"
-                       value="1"
-                       <?php checked($enabled, true); ?> />
-                <?php _e('Add a detailed note to the order after applying a fix.', 'wc-fix-shipping-tax'); ?>
-            </label>
-            <p class="description">
-                <?php _e('The note shows the before and after values for shipping items and order totals.', 'wc-fix-shipping-tax'); ?>
-            </p>
-        </fieldset>
-        <?php
-    }
-
-    /**
-     * Render order list column field
-     */
-    public function render_order_list_column_field() {
-        $settings = self::get_settings();
-        $enabled = $settings['enable_order_list_column'];
-        ?>
-        <fieldset>
-            <legend class="screen-reader-text">
-                <span><?php _e('Enable Order List Column', 'wc-fix-shipping-tax'); ?></span>
-            </legend>
-            <label for="wcfst_enable_order_list_column">
-                <input type="checkbox"
-                       id="wcfst_enable_order_list_column"
-                       name="wcfst_settings[enable_order_list_column]"
-                       value="1"
-                       <?php checked($enabled, true); ?> />
-                <?php _e('Enable the "Shipping Tax" column and filter in the WooCommerce order list.', 'wc-fix-shipping-tax'); ?>
-            </label>
-            <p class="description">
-                <?php _e('This feature adds a custom column to the order list for viewing and filtering by shipping tax rate.', 'wc-fix-shipping-tax'); ?>
-            </p>
-        </fieldset>
-        <?php
-    }
-
-    /**
-     * Render update meta field
-     */
-    public function render_update_meta_field() {
-        ?>
-        <p><?php _e('This tool will scan your 200 latest orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?></p>
-        <form method="post">
-            <input type="hidden" name="wcfst_action" value="update_meta">
-            <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
-            <?php submit_button(__('Start Meta Update', 'wc-fix-shipping-tax'), 'secondary', 'wcfst_update_meta_submit'); ?>
-        </form>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <?php _e('Process Existing Orders', 'wc-fix-shipping-tax'); ?>
+            </th>
+            <td class="forminp forminp-button">
+                <p class="description">
+                    <?php _e('This tool will scan your 200 latest orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?>
+                </p>
+                <form method="post" style="display: inline-block; margin-top: 10px;">
+                    <input type="hidden" name="wcfst_action" value="update_meta">
+                    <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
+                    <button type="submit" class="button-secondary"><?php _e('Start Meta Update', 'wc-fix-shipping-tax'); ?></button>
+                </form>
+            </td>
+        </tr>
         <?php
     }
 
@@ -267,42 +139,13 @@ class WCFST_Settings {
     }
 
     /**
-     * Sanitize settings
-     */
-    public function sanitize_settings($input) {
-        $sanitized = array();
-
-        $sanitized['enable_logging'] = isset($input['enable_logging']) ? (bool) $input['enable_logging'] : false;
-        $sanitized['auto_backup'] = isset($input['auto_backup']) ? (bool) $input['auto_backup'] : false;
-        $sanitized['enable_order_list_column'] = isset($input['enable_order_list_column']) ? (bool) $input['enable_order_list_column'] : false;
-
-        return $sanitized;
-    }
-
-    /**
-     * Get plugin settings
+     * Get plugin settings in the old format for backward compatibility
      */
     public static function get_settings() {
-        return get_option('wcfst_settings', array(
-            'enable_logging' => false,
-            'auto_backup' => true,
-            'enable_order_list_column' => false,
-        ));
-    }
-
-    /**
-     * Check if logging is enabled
-     */
-    public static function is_logging_enabled() {
-        $settings = self::get_settings();
-        return isset($settings['enable_logging']) && $settings['enable_logging'];
-    }
-
-    /**
-     * Check if auto backup is enabled
-     */
-    public static function is_auto_backup_enabled() {
-        $settings = self::get_settings();
-        return isset($settings['auto_backup']) ? $settings['auto_backup'] : true;
+        $settings = array();
+        $settings['enable_order_list_column'] = get_option('wcfst_enable_order_list_column', 'no') === 'yes';
+        $settings['auto_backup'] = get_option('wcfst_auto_backup', 'yes') === 'yes';
+        $settings['enable_logging'] = get_option('wcfst_enable_logging', 'no') === 'yes';
+        return $settings;
     }
 }
