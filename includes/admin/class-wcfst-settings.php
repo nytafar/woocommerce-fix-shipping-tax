@@ -25,8 +25,26 @@ class WCFST_Settings {
     private function init_hooks() {
         add_filter('woocommerce_get_sections_tax', array($this, 'add_tax_section'));
         add_filter('woocommerce_get_settings_tax', array($this, 'add_tax_settings'), 10, 2);
-        add_action('woocommerce_admin_field_wcfst_update_meta_button', array($this, 'render_update_meta_button'));
+        add_action('woocommerce_admin_field_wcfst_date_range_picker', array($this, 'render_date_range_picker'));
         add_action('admin_init', array($this, 'handle_tools_actions'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_datepicker_scripts'));
+    }
+
+    /**
+     * Enqueue datepicker scripts
+     */
+    public function enqueue_datepicker_scripts($hook) {
+        if ($hook === 'woocommerce_page_wc-settings' && isset($_GET['tab']) && $_GET['tab'] === 'tax') {
+            wp_enqueue_script('jquery-ui-datepicker');
+            wp_enqueue_style('jquery-ui-style', 'https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css');
+            wc_enqueue_js("
+                jQuery(function($) {
+                    $('.wcfst-datepicker').datepicker({
+                        dateFormat: 'yy-mm-dd'
+                    });
+                });
+            ");
+        }
     }
 
     /**
@@ -79,8 +97,8 @@ class WCFST_Settings {
                     'id'    => 'wcfst_tools_title',
                 ),
                 array(
-                    'title' => __('Update Order Meta', 'wc-fix-shipping-tax'),
-                    'type'  => 'wcfst_update_meta_button',
+                    'title' => __('Process Existing Orders', 'wc-fix-shipping-tax'),
+                    'type'  => 'wcfst_date_range_picker',
                 ),
                 array(
                     'type' => 'sectionend',
@@ -93,22 +111,24 @@ class WCFST_Settings {
     }
 
     /**
-     * Render the update meta button
+     * Render the date range picker tool
      */
-    public function render_update_meta_button() {
+    public function render_date_range_picker() {
         ?>
         <tr valign="top">
             <th scope="row" class="titledesc">
-                <?php _e('Process Existing Orders', 'wc-fix-shipping-tax'); ?>
+                <?php _e('Update Order Meta', 'wc-fix-shipping-tax'); ?>
             </th>
-            <td class="forminp forminp-button">
-                <p class="description">
-                    <?php _e('This tool will scan your 200 latest orders and save the shipping tax rate to make filtering on the order list page faster and more accurate.', 'wc-fix-shipping-tax'); ?>
-                </p>
-                <form method="post" style="display: inline-block; margin-top: 10px;">
+            <td class="forminp">
+                <form method="post">
+                    <input type="text" name="wcfst_start_date" class="wcfst-datepicker" placeholder="Start Date (YYYY-MM-DD)" />
+                    <input type="text" name="wcfst_end_date" class="wcfst-datepicker" placeholder="End Date (YYYY-MM-DD)" />
+                    <p class="description">
+                        <?php _e('Select a date range to process orders and populate the shipping tax meta for filtering. Leave blank to process all orders.', 'wc-fix-shipping-tax'); ?>
+                    </p>
                     <input type="hidden" name="wcfst_action" value="update_meta">
                     <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
-                    <button type="submit" class="button-secondary"><?php _e('Start Meta Update', 'wc-fix-shipping-tax'); ?></button>
+                    <button type="submit" class="button-secondary" style="margin-top: 10px;"><?php _e('Start Processing', 'wc-fix-shipping-tax'); ?></button>
                 </form>
             </td>
         </tr>
@@ -127,13 +147,17 @@ class WCFST_Settings {
                 return;
             }
 
+            $start_date = !empty($_POST['wcfst_start_date']) ? sanitize_text_field($_POST['wcfst_start_date']) : '';
+            $end_date = !empty($_POST['wcfst_end_date']) ? sanitize_text_field($_POST['wcfst_end_date']) : '';
+
             $core = WCFST()->get_module('core');
             if ($core) {
-                $core->schedule_meta_update();
+                $core->schedule_meta_update($start_date, $end_date);
             }
 
             add_action('admin_notices', function() {
-                echo '<div class="notice notice-success is-dismissible"><p>' . __('Order meta update process has been scheduled. It will run in the background.', 'wc-fix-shipping-tax') . '</p></div>';
+                $message = __('Order meta update process has been scheduled. It will run in the background.', 'wc-fix-shipping-tax');
+                echo '<div class="notice notice-success is-dismissible"><p>' . $message . '</p></div>';
             });
         }
     }

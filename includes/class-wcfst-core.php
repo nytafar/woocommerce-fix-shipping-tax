@@ -378,23 +378,15 @@ class WCFST_Core {
     /**
      * Schedule background meta update
      */
-    public function schedule_meta_update() {
-        // Get the 200 latest order IDs
-        $query = new WC_Order_Query(array(
-            'limit' => 200,
-            'orderby' => 'date',
-            'order' => 'DESC',
-            'return' => 'ids',
-        ));
-        $order_ids = $query->get_orders();
-
-        // Store them in a transient
-        set_transient('wcfst_orders_to_process', $order_ids, DAY_IN_SECONDS);
-
-        // Schedule the first batch if not already scheduled.
-        if (function_exists('as_next_scheduled_action') && !as_next_scheduled_action('wcfst_process_orders_batch')) {
-            as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', array('is_first' => true), 'wcfst');
-        }
+    public function schedule_meta_update($start_date = '', $end_date = '') {
+        $args = array(
+            'is_first' => true,
+            'start_date' => $start_date,
+            'end_date' => $end_date,
+        );
+        // Cancel any existing job before starting a new one
+        as_unschedule_all_actions('wcfst_process_orders_batch');
+        as_schedule_single_action(time() + 5, 'wcfst_process_orders_batch', $args, 'wcfst');
     }
 
     /**
@@ -402,37 +394,58 @@ class WCFST_Core {
      */
     public function process_orders_batch($args = array()) {
         $is_first = isset($args['is_first']) && $args['is_first'];
-
         if ($is_first) {
-            $this->log('Starting batch processing of the 200 latest orders.');
+            $this->log('Starting batch processing of orders for shipping tax meta.');
         }
 
-        // Get orders from transient
-        $order_ids = get_transient('wcfst_orders_to_process');
+        $start_date = $args['start_date'] ?? '';
+        $end_date = $args['end_date'] ?? '';
 
-        if (empty($order_ids)) {
+        $query_args = array(
+            'limit' => 50,
+            'orderby' => 'date',
+            'order' => 'ASC',
+            'meta_query' => array(
+                array(
+                    'key' => '_wcfst_shipping_tax_rate',
+                    'compare' => 'NOT EXISTS',
+                ),
+            ),
+            'return' => 'ids',
+        );
+
+        if ($start_date && $end_date) {
+            $query_args['date_query'] = array(
+                array(
+                    'after'     => $start_date . ' 00:00:00',
+                    'before'    => $end_date . ' 23:59:59',
+                    'inclusive' => true,
+                ),
+            );
+        }
+
+        $query = new WC_Order_Query($query_args);
+        $orders = $query->get_orders();
+
+        if (empty($orders)) {
             $this->log('No more orders to process. Batch processing complete.');
-            delete_transient('wcfst_orders_to_process');
             return;
         }
 
-        // Get a batch of 50
-        $batch_ids = array_splice($order_ids, 0, 50);
+        $this->log('Found ' . count($orders) . ' orders to process in this batch.');
 
-        $this->log('Found ' . count($batch_ids) . ' orders to process in this batch.');
-
-        foreach ($batch_ids as $order_id) {
+        foreach ($orders as $order_id) {
             $this->update_order_meta($order_id);
         }
 
-        // Update the transient with the remaining IDs
-        set_transient('wcfst_orders_to_process', $order_ids, DAY_IN_SECONDS);
-
-        // Schedule the next batch if there are more orders
-        if (!empty($order_ids)) {
-            as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', array('is_first' => false), 'wcfst');
-            $this->log('Finished a batch. Scheduled the next one.');
-        }
+        // Schedule the next batch
+        $next_batch_args = array(
+            'is_first' => false,
+            'start_date' => $start_date,
+            'end_date' => $end_date,
+        );
+        as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', $next_batch_args, 'wcfst');
+        $this->log('Finished a batch. Scheduled the next one.');
     }
 
     /**

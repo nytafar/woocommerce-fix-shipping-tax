@@ -1,202 +1,80 @@
-# WooCommerce Fix Shipping Tax
+=== WooCommerce Fix Shipping Tax ===
+Contributors: lassejellum
+Tags: woocommerce, tax, vat, norwegian, accounting
+Requires at least: 5.6
+Tested up to: 8.0
+Stable tag: 3.0.0
+Requires PHP: 7.4
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A comprehensive WooCommerce plugin for fixing shipping tax calculations in existing orders. This plugin ensures proper VAT distribution for shipping costs while maintaining order totals and providing a clean, professional admin interface.
+A comprehensive tool for correcting WooCommerce shipping tax distribution on existing orders while preserving order totals.
 
-## 🎯 Features
+== Description ==
 
-### ✅ Core Functionality
-- **Tax Rate Correction**: Fix shipping tax calculations to 15% or 25% VAT rates
-- **Order Total Preservation**: Maintains original order totals while correcting tax distribution
-- **Visual Comparison**: Before/after preview of tax calculations
-- **Bulk Operations**: Apply fixes to multiple orders simultaneously
+WooCommerce Fix Shipping Tax provides essential tooling for store owners, especially in regions with multiple VAT rates like Norway (15% and 25%). It allows you to correct the shipping tax on completed orders without altering the grand total, ensuring your accounting is accurate.
 
-### ✅ Admin Interface
-- **Order Meta Box**: Tabbed interface showing current vs. proposed tax calculations
-- **Order Actions**: Preview and Apply buttons for 15% and 25% tax rates
-- **Order List Column**: Display current shipping tax rates in the orders list
-- **Filter Dropdown**: Filter orders by shipping tax rate
-- **Bulk Actions**: Preview and apply fixes to multiple orders
+The plugin provides a full suite of tools to handle this, from a detailed preview on individual orders to bulk actions and a filterable order list column. All operations are designed to be safe, with detailed logging and order notes to provide a clear audit trail.
 
-### ✅ Order Management
-- **Complete Order Editability**: All orders remain editable regardless of status
-- **Security**: Proper capability checks and nonce verification
-- **Error Handling**: Comprehensive error reporting and logging
-- **Clean Architecture**: Modular, maintainable code structure
+== Features ==
 
-## 📋 Requirements
+*   **Corrects Shipping Tax**: Recalculates and applies the correct 15% or 25% VAT to the shipping cost on any existing order.
+*   **Preserves Order Grand Total**: The order's final price is never changed, ensuring consistency with payment gateway records.
+*   **Detailed Previews**: Before applying a fix, you can see a detailed preview of the changes to the shipping item and the order totals.
+*   **Single Order Fixing**: A meta box on the order edit screen allows for easy, one-click fixing.
+*   **Bulk Actions**: Apply fixes to multiple orders at once from the WooCommerce order list.
+*   **Order List Integration**: Adds a "Shipping Tax" column to the order list, showing the calculated rate for each order.
+*   **Filter by Shipping Tax**: A new filter allows you to find orders with a specific shipping tax rate (15%, 25%, 0%, or none).
+*   **Configurable Settings**: All features can be configured from the WooCommerce settings panel.
+*   **Detailed Order Notes**: When a fix is applied, a comprehensive note is added to the order, detailing all the changes.
+*   **Background Processing**: A tool is provided to process orders in the background to populate the data for the order list column.
 
-- **WordPress**: 5.6 or higher
-- **WooCommerce**: 5.0 or higher
-- **PHP**: 7.4 or higher
+== Installation ==
 
-## 🚀 Installation
+1.  Upload the plugin files to the `/wp-content/plugins/woocommerce-fix-shipping-tax` directory, or install the plugin through the WordPress plugins screen directly.
+2.  Activate the plugin through the 'Plugins' screen in WordPress.
+3.  Navigate to **WooCommerce > Settings > Tax > Shipping Tax Fix** to configure the plugin.
 
-1. Download the plugin files
-2. Upload to `/wp-content/plugins/woocommerce-fix-shipping-tax/`
-3. Activate the plugin through the WordPress admin
-4. Navigate to any order to see the "Fix Shipping Tax" meta box
+== Usage ==
 
-## 📖 Usage
+### Enabling the Order List Column
 
-### Single Order Fix
+By default, the "Shipping Tax" column is disabled for performance reasons. To enable it:
+1.  Go to **WooCommerce > Settings > Tax > Shipping Tax Fix**.
+2.  Check the "Enable Order List Column" checkbox and save.
 
-1. Go to **WooCommerce > Orders**
-2. Click on any order to edit it
-3. Look for the **"Fix Shipping Tax"** meta box on the right side
-4. Choose between **15%** or **25%** tax rate tabs
-5. Review the **current vs. proposed** values
-6. Click **"Apply [Rate]% Fix"** to apply the correction
+### Populating the Shipping Tax Data
 
-### Bulk Operations
+To make the order list column and filtering work for your existing orders, you need to run the background processing tool:
+1.  Go to **WooCommerce > Settings > Tax > Shipping Tax Fix**.
+2.  Under the "Tools" section, select a date range for the orders you want to process (or leave it blank to process all orders).
+3.  Click "Start Processing". The process will run in the background.
 
-1. Go to **WooCommerce > Orders**
-2. Select multiple orders using checkboxes
-3. Choose **"Apply Shipping Tax Fix (15%)"** or **"Apply Shipping Tax Fix (25%)"** from Bulk Actions
-4. Click **"Apply"** to process multiple orders
+### Fixing a Single Order
 
-### Order List Filtering
+1.  Navigate to the edit screen for any WooCommerce order.
+2.  On the right side, you will find the **Fix Shipping Tax** meta box.
+3.  The box shows the current calculated shipping tax rate.
+4.  You can switch between the "15% Tax Rate" and "25% Tax Rate" tabs to see a preview of the fix.
+5.  The preview shows the changes to the shipping item and the main order totals.
+6.  If you are happy with the preview, click the **Apply Fix** button.
 
-1. Go to **WooCommerce > Orders**
-2. Use the **"Shipping Tax Rate"** filter dropdown
-3. Filter by **15%**, **25%**, **Other**, or **None**
+### Fixing Orders in Bulk
 
-## 🏗️ Architecture
+1.  Go to the **WooCommerce > Orders** list page.
+2.  Select the orders you want to fix using the checkboxes.
+3.  From the "Bulk actions" dropdown, choose one of the "Apply Shipping Tax Fix" options.
+4.  Click "Apply".
 
-### Modular Structure
+== Changelog ==
 
-```
-woocommerce-fix-shipping-tax/
-├── woocommerce-fix-shipping-tax.php     # Main plugin file
-├── includes/
-│   ├── class-wcfst-core.php             # Core business logic
-│   └── admin/
-│       ├── class-wcfst-admin.php        # Admin coordination
-│       ├── class-wcfst-order-meta-box.php # Single order UI
-│       ├── class-wcfst-order-list.php   # Order list enhancements
-│       └── class-wcfst-bulk-actions.php # Bulk operations
-└── assets/
-    ├── css/
-    │   └── admin.css                    # Admin styles
-    └── js/
-        └── admin.js                     # Admin scripts
-```
+= 3.0.0 =
+*   Complete rewrite of the plugin with a modern, modular architecture.
+*   Moved settings to a subtab under WooCommerce > Settings > Tax.
+*   Added a date range picker for the background processing tool.
+*   Added a setting to enable/disable the order list column.
+*   Improved the order note to be more detailed and have a dynamic title.
+*   Fixed numerous bugs related to total calculations and data refreshing.
 
-### Key Classes
-
-- **`WCFST_Core`**: Handles all tax calculations and order manipulations
-- **`WCFST_Admin`**: Coordinates admin functionality and hooks
-- **`WCFST_Order_Meta_Box`**: Manages single order UI
-- **`WCFST_Order_List`**: Handles order list enhancements
-- **`WCFST_Bulk_Actions`**: Manages bulk operations
-
-## 🔧 Technical Details
-
-### Tax Calculation Logic
-
-The plugin uses the following approach:
-
-1. **Calculate Target Values**: Determine correct base + VAT for target rate
-2. **Preserve Order Total**: Store original total before making changes
-3. **Apply Tax Fix**: Update shipping items with correct base and VAT
-4. **Update Tax Items**: Recreate tax line items with proper distribution
-5. **Restore Total**: Set order total back to original amount
-
-### Database Impact
-
-- **No order total changes**: Original totals are preserved
-- **Tax line updates**: Product and shipping taxes properly separated
-- **Meta data**: Optional storage of processing information
-- **No data loss**: All operations are reversible
-
-## 🛡️ Security
-
-- **Capability Checks**: All actions require `edit_shop_orders` capability
-- **Nonce Verification**: CSRF protection on all AJAX requests
-- **Input Sanitization**: All user input properly validated
-- **SQL Injection Prevention**: Prepared statements for database queries
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-**Orders not editable after plugin activation:**
-- Ensure the plugin is properly activated
-- Check that user has `edit_shop_orders` capability
-- Verify no other plugins are interfering with order editing
-
-**Tax calculations showing incorrect values:**
-- Verify WooCommerce tax rates are properly configured
-- Check that the order has valid shipping items
-- Review browser console for JavaScript errors
-
-**Bulk actions not working:**
-- Ensure user has proper permissions
-- Check that orders are not locked by other processes
-- Verify AJAX endpoints are accessible
-
-### Debug Mode
-
-Enable debug logging by adding to `wp-config.php`:
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-```
-
-## 📝 Changelog
-
-### Version 2.0.0
-- Complete rewrite with modular architecture
-- Added comprehensive error handling
-- Improved security with nonce verification
-- Added order list filtering and columns
-- Enhanced bulk operations
-- Better user interface with tabbed design
-
-### Version 1.1.0 (Legacy)
-- Original implementation
-- Basic tax fixing functionality
-- Simple admin interface
-
-## 🧪 Development
-
-### Adding New Tax Rates
-
-To add support for additional tax rates:
-
-1. Update the `$tax_rates` array in `WCFST_Core`
-2. Add corresponding UI elements in the meta box
-3. Update order actions and bulk actions
-4. Test thoroughly with various order types
-
-### Extending Functionality
-
-The modular architecture makes it easy to extend:
-
-- **New calculation methods**: Add to `WCFST_Core`
-- **Additional UI components**: Create new admin classes
-- **Custom order actions**: Extend `WCFST_Admin`
-- **New bulk operations**: Enhance `WCFST_Bulk_Actions`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This plugin is released under the GPL v2 or later.
-
-## 🆘 Support
-
-For support and questions:
-- Check the troubleshooting section above
-- Review WooCommerce and WordPress logs
-- Ensure all requirements are met
-- Test with a minimal setup if issues persist
-
----
-
-**Made with ❤️ for WooCommerce store owners**
+= 2.0.0 =
+*   Initial release of the new version.
