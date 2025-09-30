@@ -142,6 +142,8 @@ class WCFST_Core {
             return array('success' => false, 'message' => __('Invalid order object', 'wc-fix-shipping-tax'));
         }
 
+        $original_shipping_tax_rate = $this->get_order_shipping_tax_rate($order);
+
         $calculation_data = $this->calculate_shipping_tax_fix($order, $tax_rate);
         if (empty($calculation_data) || empty($calculation_data['items'])) {
             $this->log('No shipping items found for tax fix');
@@ -235,6 +237,44 @@ class WCFST_Core {
 
             // Update the meta field for the order list column
             $this->update_order_meta($order->get_id());
+
+            // Create a detailed order note
+            $preview = $calculation_data['preview'];
+            $note_title = sprintf(
+                __("Updated Shipping Tax %d%% → %d%%", "wc-fix-shipping-tax"),
+                $original_shipping_tax_rate,
+                $tax_rate
+            );
+            $note = $note_title . "\n\n";
+
+            $note .= "<strong>" . __("Shipping Item Changes:", "wc-fix-shipping-tax") . "</strong>\n";
+            foreach ($calculations as $item_id => $calc) {
+                $note .= sprintf(
+                    __("%s: Base %s + VAT %s → Base %s + VAT %s", "wc-fix-shipping-tax"),
+                    $calc['shipping_method'],
+                    wc_price($calc['current_base']),
+                    wc_price($calc['current_vat']),
+                    wc_price($calc['new_base']),
+                    wc_price($calc['new_vat'])
+                ) . "\n";
+            }
+            $note .= "\n";
+
+            $note .= "<strong>" . __("Order Totals Changes:", "wc-fix-shipping-tax") . "</strong>\n";
+            $note .= "----------------------------------\n";
+            $note .= sprintf(__("Shipping: %s → %s", "wc-fix-shipping-tax"), wc_price($preview['before']['shipping']), wc_price($preview['after']['shipping'])) . "\n";
+
+            $all_tax_rate_ids = array_unique(array_merge(array_keys($preview['before']['taxes']), array_keys($preview['after']['taxes'])));
+
+            foreach ($all_tax_rate_ids as $rate_id) {
+                $before_tax = $preview['before']['taxes'][$rate_id] ?? ['label' => WC_Tax::get_rate_label($rate_id), 'total' => 0];
+                $after_tax = $preview['after']['taxes'][$rate_id] ?? ['label' => WC_Tax::get_rate_label($rate_id), 'total' => 0];
+                
+                if (abs($before_tax['total'] - $after_tax['total']) > 0.01) {
+                    $note .= sprintf(__("%s: %s → %s", "wc-fix-shipping-tax"), $before_tax['label'], wc_price($before_tax['total']), wc_price($after_tax['total'])) . "\n";
+                }
+            }
+            $order->add_order_note($note);
 
             $this->log("Shipping tax fix applied successfully, total preserved: " . wc_price($original_total));
             return array('success' => true, 'message' => sprintf(__('Shipping tax fix applied successfully (%d%%)', 'wc-fix-shipping-tax'), $tax_rate));
