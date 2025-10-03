@@ -114,10 +114,18 @@ class WCFST_Order_List {
      */
     public function handle_column_sorting($vars) {
         if (isset($vars['orderby']) && 'shipping_tax_rate' === $vars['orderby']) {
-            $vars = array_merge($vars, array(
-                'meta_key' => '_wcfst_shipping_tax_rate',
-                'orderby' => 'meta_value_num',
-            ));
+            $vars['meta_query'] = array(
+                'relation' => 'OR',
+                array(
+                    'key'     => '_wcfst_shipping_tax_rate',
+                    'compare' => 'NOT EXISTS',
+                ),
+                array(
+                    'key'     => '_wcfst_shipping_tax_rate',
+                    'compare' => 'EXISTS',
+                ),
+            );
+            $vars['orderby'] = 'meta_value_num';
         }
         
         return $vars;
