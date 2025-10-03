@@ -130,6 +130,11 @@ class WCFST_Settings {
                     <?php wp_nonce_field('wcfst_update_meta_nonce', 'wcfst_nonce'); ?>
                     <button type="submit" class="button-secondary" style="margin-top: 10px;"><?php _e('Start Processing', 'wc-fix-shipping-tax'); ?></button>
                 </form>
+                <form method="post" style="display: inline-block; margin-left: 10px;">
+                    <input type="hidden" name="wcfst_action" value="stop_meta_update">
+                    <?php wp_nonce_field('wcfst_stop_meta_nonce', 'wcfst_nonce'); ?>
+                    <button type="submit" class="button-primary" style="margin-top: 10px;"><?php _e('Stop Processing', 'wc-fix-shipping-tax'); ?></button>
+                </form>
             </td>
         </tr>
         <?php
@@ -158,6 +163,23 @@ class WCFST_Settings {
             add_action('admin_notices', function() {
                 $message = __('Order meta update process has been scheduled. It will run in the background.', 'wc-fix-shipping-tax');
                 echo '<div class="notice notice-success is-dismissible"><p>' . $message . '</p></div>';
+            });
+        } elseif (isset($_POST['wcfst_action']) && $_POST['wcfst_action'] === 'stop_meta_update') {
+            if (!isset($_POST['wcfst_nonce']) || !wp_verify_nonce($_POST['wcfst_nonce'], 'wcfst_stop_meta_nonce')) {
+                return;
+            }
+            if (!current_user_can('manage_woocommerce')) {
+                return;
+            }
+
+            $core = WCFST()->get_module('core');
+            if ($core) {
+                $core->cancel_meta_update();
+            }
+
+            add_action('admin_notices', function() {
+                $message = __('Order meta update process has been stopped.', 'wc-fix-shipping-tax');
+                echo '<div class="notice notice-warning is-dismissible"><p>' . $message . '</p></div>';
             });
         }
     }

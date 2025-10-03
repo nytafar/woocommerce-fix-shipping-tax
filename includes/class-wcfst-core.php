@@ -390,6 +390,14 @@ class WCFST_Core {
     }
 
     /**
+     * Cancel background meta update
+     */
+    public function cancel_meta_update() {
+        as_unschedule_all_actions('wcfst_process_orders_batch');
+        $this->log('Batch processing of orders for shipping tax meta has been manually stopped.');
+    }
+
+    /**
      * Process a batch of orders to update meta
      */
     public function process_orders_batch($args = array()) {
