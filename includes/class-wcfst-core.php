@@ -37,6 +37,58 @@ class WCFST_Core {
 
         // Add hook for background processing
         add_action('wcfst_process_orders_batch', array($this, 'process_orders_batch'), 10, 1);
+        
+        // Add hook for order item price rounding if enabled
+        $this->init_item_rounding();
+    }
+    
+    /**
+     * Initialize order item price rounding hook if enabled
+     */
+    private function init_item_rounding() {
+        if (!empty($this->settings['enable_item_rounding'])) {
+            add_action('woocommerce_checkout_create_order_line_item', array($this, 'round_order_item_prices'), 20, 4);
+        }
+    }
+    
+    /**
+     * Round order item prices to configured decimal precision
+     * 
+     * This eliminates rounding errors when transferring orders to accounting systems like Fiken
+     * by saving order item prices with consistent decimal precision (typically 2 decimals for Fiken).
+     * 
+     * Trade-off: Order totals may show prices like 1308,01 due to 2-decimal tax calculations.
+     * 
+     * @param WC_Order_Item_Product $item Order line item object
+     * @param string $cart_item_key Cart item key
+     * @param array $values Cart item values
+     * @param WC_Order $order Order object
+     */
+    public function round_order_item_prices($item, $cart_item_key, $values, $order) {
+        // Get the configured decimal precision (default to 2 for Fiken compatibility)
+        $precision = isset($this->settings['item_precision_value']) ? $this->settings['item_precision_value'] : 2;
+        
+        // Get quantity
+        $qty = $item->get_quantity();
+        
+        // Get unit price excluding tax from cart item data
+        // Round to the configured precision for consistency
+        $unit_price_excl_tax = round($values['data']->get_price_excluding_tax(), $precision);
+        
+        // Calculate totals based on rounded unit price
+        $subtotal = $unit_price_excl_tax * $qty;
+        
+        // Set subtotal and total for item (excluding tax)
+        $item->set_subtotal($subtotal);
+        $item->set_total($subtotal);
+        
+        $this->log(sprintf(
+            'Rounded order item price: %s (qty: %d, unit price: %s, precision: %d)',
+            $values['data']->get_name(),
+            $qty,
+            wc_price($unit_price_excl_tax),
+            $precision
+        ));
     }
     
     /**

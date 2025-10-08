@@ -29,9 +29,18 @@ class WCFST_Settings {
         add_action('woocommerce_admin_field_wcfst_precision_info', array($this, 'render_precision_info'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_datepicker_scripts'));
         add_action('wp_ajax_wcfst_run_tool', array($this, 'handle_ajax_actions'));
+        add_action('woocommerce_update_options_tax_wcfst', array($this, 'sync_precision_settings'));
         
         // Apply decimal precision override if enabled
         $this->apply_precision_override();
+    }
+    
+    /**
+     * Sync item precision with general precision when settings are saved
+     */
+    public function sync_precision_settings() {
+        $precision_value = get_option('wcfst_precision_value', '2');
+        update_option('wcfst_item_precision_value', $precision_value);
     }
 
     /**
@@ -134,6 +143,36 @@ class WCFST_Settings {
                 array(
                     'type' => 'sectionend',
                     'id'   => 'wcfst_precision_section_end',
+                ),
+                array(
+                    'title' => __('Fiken Integration Settings', 'wc-fix-shipping-tax'),
+                    'type'  => 'title',
+                    'desc'  => __('Configure order item price rounding for Fiken and similar accounting system integrations.', 'wc-fix-shipping-tax'),
+                    'id'    => 'wcfst_item_rounding_title',
+                ),
+                array(
+                    'title'   => __('Enable Order Item Price Rounding', 'wc-fix-shipping-tax'),
+                    'desc'    => __('Round order item prices during checkout to eliminate rounding errors. <strong>Required for Fiken integration.</strong>', 'wc-fix-shipping-tax'),
+                    'id'      => 'wcfst_enable_item_rounding',
+                    'type'    => 'checkbox',
+                    'default' => 'no',
+                    'desc_tip' => __('This saves order item prices with the decimal precision specified above (typically 2 decimals for Fiken), eliminating rounding errors when transferring orders to accounting systems. Trade-off: Order totals may show prices like 1308,01 due to 2-decimal tax calculations.', 'wc-fix-shipping-tax'),
+                ),
+                array(
+                    'title'             => __('Item Price Decimal Precision', 'wc-fix-shipping-tax'),
+                    'desc'              => __('<strong>Fiken requires 2 decimals.</strong> This value is automatically synchronized with the "Decimal Precision" setting above to ensure consistency across all calculations.', 'wc-fix-shipping-tax'),
+                    'id'                => 'wcfst_item_precision_value',
+                    'type'              => 'number',
+                    'default'           => '2',
+                    'custom_attributes' => array(
+                        'min'  => '0',
+                        'max'  => '10',
+                        'step' => '1',
+                    ),
+                ),
+                array(
+                    'type' => 'sectionend',
+                    'id'   => 'wcfst_item_rounding_section_end',
                 ),
                 array(
                     'title' => __('Tools', 'wc-fix-shipping-tax'),
@@ -279,6 +318,8 @@ class WCFST_Settings {
         $settings['enable_logging'] = get_option('wcfst_enable_logging', 'no') === 'yes';
         $settings['enable_precision_override'] = get_option('wcfst_enable_precision_override', 'no') === 'yes';
         $settings['precision_value'] = absint(get_option('wcfst_precision_value', '2'));
+        $settings['enable_item_rounding'] = get_option('wcfst_enable_item_rounding', 'no') === 'yes';
+        $settings['item_precision_value'] = absint(get_option('wcfst_item_precision_value', '2'));
         return $settings;
     }
 }
