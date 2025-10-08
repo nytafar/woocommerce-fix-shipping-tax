@@ -24,6 +24,11 @@ The settings are organized into separate, focused classes:
 - Independent from backend display precision
 - Fiken requires 2 decimal precision
 
+### Order Editing Settings (`class-wcfst-settings-order-editing.php`)
+- Controls whether completed orders can be edited
+- **Disabled by default** for safety
+- Enables editing of orders regardless of status when activated
+
 ### Tools Settings (`class-wcfst-settings-tools.php`)
 - Manages batch processing tools
 - Handles date range picker for order processing

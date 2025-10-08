@@ -54,6 +54,10 @@ class WCFST_Settings_Base {
             $fiken_settings = new WCFST_Settings_Fiken();
             $wcfst_settings = array_merge($wcfst_settings, $fiken_settings->get_settings());
             
+            // Order editing settings
+            $order_editing_settings = new WCFST_Settings_Order_Editing();
+            $wcfst_settings = array_merge($wcfst_settings, $order_editing_settings->get_settings());
+            
             // Tools settings
             $tools_settings = new WCFST_Settings_Tools();
             $wcfst_settings = array_merge($wcfst_settings, $tools_settings->get_settings());
@@ -137,6 +141,7 @@ class WCFST_Settings_Base {
         $settings['precision_value'] = absint(get_option('wcfst_precision_value', '2'));
         $settings['enable_item_rounding'] = get_option('wcfst_enable_item_rounding', 'no') === 'yes';
         $settings['item_precision_value'] = absint(get_option('wcfst_item_precision_value', '2'));
+        $settings['enable_order_editing'] = get_option('wcfst_enable_order_editing', 'no') === 'yes';
         return $settings;
     }
 }

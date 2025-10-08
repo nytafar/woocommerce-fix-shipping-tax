@@ -18,10 +18,21 @@ class WCFST_Admin {
     private $core;
     
     /**
+     * Settings reference
+     */
+    private $settings;
+    
+    /**
      * Constructor
      */
     public function __construct($core) {
         $this->core = $core;
+        
+        // Load settings if available
+        if (class_exists('WCFST_Settings')) {
+            $this->settings = WCFST_Settings::get_settings();
+        }
+        
         $this->init_hooks();
     }
     
@@ -39,10 +50,12 @@ class WCFST_Admin {
         add_action('woocommerce_order_action_wcfst_preview_25', array($this, 'preview_tax_25'));
         add_action('woocommerce_order_action_wcfst_apply_25', array($this, 'apply_tax_25'));
         
-        // Make orders editable regardless of status
-        add_filter('wc_order_is_editable', array($this, 'make_orders_editable'), 999, 2);
-        add_filter('woocommerce_admin_order_should_be_locked', '__return_false', 999);
-        add_filter('woocommerce_valid_order_statuses_for_payment', array($this, 'expand_valid_order_statuses'), 999, 2);
+        // Make orders editable regardless of status (only if enabled in settings)
+        if (!empty($this->settings['enable_order_editing'])) {
+            add_filter('wc_order_is_editable', array($this, 'make_orders_editable'), 999, 2);
+            add_filter('woocommerce_admin_order_should_be_locked', '__return_false', 999);
+            add_filter('woocommerce_valid_order_statuses_for_payment', array($this, 'expand_valid_order_statuses'), 999, 2);
+        }
         
         // Filter order item meta data if needed
         add_filter('woocommerce_order_item_get_formatted_meta_data', array($this, 'filter_order_item_meta'), 10, 2);

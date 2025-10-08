@@ -101,6 +101,7 @@ final class WC_Fix_Shipping_Tax {
             // Settings includes
             require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-precision.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-fiken.php';
+            require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-order-editing.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-tools.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-base.php';
             
