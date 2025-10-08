@@ -378,15 +378,17 @@ class WCFST_Core {
     /**
      * Schedule background meta update
      */
-    public function schedule_meta_update($start_date = '', $end_date = '') {
+    public function schedule_meta_update($start_date = '', $end_date = '', $overwrite = false) {
         $args = array(
             'is_first' => true,
             'start_date' => $start_date,
             'end_date' => $end_date,
+            'overwrite' => $overwrite,
         );
         // Cancel any existing job before starting a new one
         as_unschedule_all_actions('wcfst_process_orders_batch');
-        as_schedule_single_action(time() + 5, 'wcfst_process_orders_batch', $args, 'wcfst');
+        // Wrap args in array so Action Scheduler passes it as first parameter
+        as_schedule_single_action(time() + 5, 'wcfst_process_orders_batch', array($args), 'wcfst');
     }
 
     /**
@@ -404,23 +406,29 @@ class WCFST_Core {
         $is_first = isset($args['is_first']) && $args['is_first'];
         if ($is_first) {
             $this->log('Starting batch processing of orders for shipping tax meta.');
+            $this->log('Date range: ' . ($args['start_date'] ?: 'all') . ' to ' . ($args['end_date'] ?: 'all'));
+            $this->log('Overwrite existing: ' . ($args['overwrite'] ? 'yes' : 'no'));
         }
 
         $start_date = $args['start_date'] ?? '';
         $end_date = $args['end_date'] ?? '';
+        $overwrite = $args['overwrite'] ?? false;
 
         $query_args = array(
             'limit' => 50,
             'orderby' => 'date',
             'order' => 'ASC',
-            'meta_query' => array(
+            'return' => 'ids',
+        );
+
+        if (!$overwrite) {
+            $query_args['meta_query'] = array(
                 array(
                     'key' => '_wcfst_shipping_tax_rate',
                     'compare' => 'NOT EXISTS',
                 ),
-            ),
-            'return' => 'ids',
-        );
+            );
+        }
 
         if ($start_date && $end_date) {
             $query_args['date_query'] = array(
@@ -451,8 +459,10 @@ class WCFST_Core {
             'is_first' => false,
             'start_date' => $start_date,
             'end_date' => $end_date,
+            'overwrite' => $overwrite,
         );
-        as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', $next_batch_args, 'wcfst');
+        // Wrap args in array so Action Scheduler passes it as first parameter
+        as_schedule_single_action(time() + 10, 'wcfst_process_orders_batch', array($next_batch_args), 'wcfst');
         $this->log('Finished a batch. Scheduled the next one.');
     }
 
