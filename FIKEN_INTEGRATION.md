@@ -24,10 +24,12 @@ Navigate to: **WooCommerce → Settings → Tax → Shipping Tax Fix**
 ### Required Settings for Fiken
 
 1. **Enable Order Item Price Rounding**: Check this box
-2. **Decimal Precision**: Set to **2** (Fiken requirement)
-3. **Override Rounding Precision**: Enable and set to **2**
+2. **Order Item Decimal Precision**: Set to **2** (Fiken requirement)
 
-The **Item Price Decimal Precision** field is automatically synchronized with the **Decimal Precision** setting to ensure consistency across all calculations.
+### Optional Settings
+
+- **Override Rounding Precision**: This changes how calculations are displayed in the WooCommerce admin backend only. It does not affect order item prices saved to the database.
+- **Decimal Precision**: Controls backend display precision. This is independent from the order item precision setting.
 
 ## How It Works
 
@@ -75,27 +77,41 @@ This is **expected behavior** and ensures accuracy in your accounting system.
 
 ## Technical Details
 
-### Files Modified
+### Files Created/Modified
 
-1. **`includes/admin/class-wcfst-settings.php`**
-   - Added new settings section: "Fiken Integration Settings"
-   - Added checkbox: "Enable Order Item Price Rounding"
-   - Added synchronized precision field
-   - Added automatic sync on settings save
+**New Settings Architecture:**
 
-2. **`includes/class-wcfst-core.php`**
+1. **`includes/admin/settings/class-wcfst-settings-base.php`**
+   - Base settings class that coordinates all settings sections
+   - Handles general plugin settings
+
+2. **`includes/admin/settings/class-wcfst-settings-precision.php`**
+   - Manages decimal precision for backend display
+   - Applies precision override filter
+
+3. **`includes/admin/settings/class-wcfst-settings-fiken.php`**
+   - Handles Fiken integration settings
+   - Manages order item price rounding configuration
+
+4. **`includes/admin/settings/class-wcfst-settings-tools.php`**
+   - Manages tools and utilities
+   - Handles AJAX actions for batch processing
+
+**Core Functionality:**
+
+5. **`includes/class-wcfst-core.php`**
    - Added `init_item_rounding()` method
    - Added `round_order_item_prices()` method
    - Integrated with existing settings system
 
-3. **`assets/js/admin-settings.js`**
-   - Added JavaScript to sync precision values in real-time
-   - Made item precision field read-only with visual indication
+6. **`includes/admin/class-wcfst-settings.php`**
+   - Now a lightweight wrapper for backward compatibility
+   - Extends the new base settings class
 
 ### Hooks Used
 
-- `woocommerce_checkout_create_order_line_item` (priority 20)
-- `woocommerce_update_options_tax_wcfst` (for settings sync)
+- `woocommerce_checkout_create_order_line_item` (priority 20) - Rounds order item prices during checkout
+- `woocommerce_internal_rounding_precision` (priority 9999) - Overrides backend display precision (optional)
 
 ## Testing
 

@@ -97,6 +97,14 @@ final class WC_Fix_Shipping_Tax {
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-order-meta-box.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-order-list.php';
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-bulk-actions.php';
+            
+            // Settings includes
+            require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-precision.php';
+            require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-fiken.php';
+            require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-tools.php';
+            require_once WCFST_PLUGIN_DIR . 'includes/admin/settings/class-wcfst-settings-base.php';
+            
+            // Keep old settings class for backward compatibility
             require_once WCFST_PLUGIN_DIR . 'includes/admin/class-wcfst-settings.php';
         }
     }
