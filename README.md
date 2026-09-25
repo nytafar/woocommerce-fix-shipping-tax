@@ -10,6 +10,17 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 A comprehensive tool for correcting WooCommerce shipping tax distribution on existing orders while preserving order totals.
 
+**⚠️ NOT HPOS-COMPATIBLE — do not activate on a store using High-Performance Order Storage.**
+
+The plugin is written for legacy post-based order storage only:
+
+* `WCFST_Core` writes `_order_shipping`, `_order_shipping_tax`, `_order_tax` and `_order_total` with `update_post_meta()`, then calls `$order->save()`. On HPOS the totals live in `wc_orders` columns, so the direct writes are ignored and `save()` persists the old totals — the tax items get rewritten but the totals don't, leaving the order internally inconsistent.
+* `_wcfst_shipping_tax_rate` / `_wcfst_last_fix_applied` are written with `update_post_meta()` and bypass order sync (on myrvann.no this left 253 orders out of sync until a re-migrate on 2026-09-25).
+* The meta box, bulk action and order-list column hook the legacy `shop_order` / `edit-shop_order` screens and don't appear on HPOS (`woocommerce_page_wc-orders`).
+* It declares no HPOS compatibility either way, so WooCommerce won't warn you.
+
+To make it compatible: use `$order->set_shipping_total()` / `set_shipping_tax()` / `set_cart_tax()` / `set_total()` and `$order->update_meta_data()` + `save()`, hook the HPOS screens too, and add the `before_woocommerce_init` → `FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true)` declaration.
+
 == Description ==
 
 WooCommerce Fix Shipping Tax provides essential tooling for store owners, especially in regions with multiple VAT rates like Norway (15% and 25%). It allows you to correct the shipping tax on completed orders without altering the grand total, ensuring your accounting is accurate.
