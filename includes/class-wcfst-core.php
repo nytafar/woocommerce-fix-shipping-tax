@@ -196,9 +196,9 @@ class WCFST_Core {
                         $tax_rate_breakdown[$rate_id] = ['cart_tax' => 0, 'shipping_tax' => 0];
                     }
                     if ($item->is_type('shipping')) {
-                        $tax_rate_breakdown[$rate_id]['shipping_tax'] += $tax;
+                        $tax_rate_breakdown[$rate_id]['shipping_tax'] += (float) $tax;
                     } else {
-                        $tax_rate_breakdown[$rate_id]['cart_tax'] += $tax;
+                        $tax_rate_breakdown[$rate_id]['cart_tax'] += (float) $tax;
                     }
                 }
                 if ($item->is_type('shipping')) {
